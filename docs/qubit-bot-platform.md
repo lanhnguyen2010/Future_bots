@@ -350,6 +350,5 @@ down:       ## compose down -v
 seed:       ## apply schema to Timescale
 api:        ## run Go API
 bot:        ## run Python bot locally
-web:        ## run dashboard dev server
 dev: create dev container
 ```

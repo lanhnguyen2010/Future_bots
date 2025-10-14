@@ -7,7 +7,6 @@ This repository houses the full system design and scaffolding for the Qubit Bot 
 ```
 .
 ├── apps
-│   ├── dashboard/          # Real-time web console (frontend + gateway adapters)
 │   ├── executor/           # Golang trade executor microservice
 │   ├── reports/            # Golang reporting & analytics service
 │   ├── risk/               # Golang risk engine service
@@ -41,7 +40,6 @@ Run `make help` to see available commands. Key targets include:
 - `make seed` – apply core schemas to the Timescale database.
 - `make api` – run the Supervisor/Executor Go services locally.
 - `make bot` – execute a Python bot using the SDK runner.
-- `make web` – launch the dashboard development server.
 - `make down` – stop all local dependencies and clean volumes.
 
 ## Protobuf Schemas

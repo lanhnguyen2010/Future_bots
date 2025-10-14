@@ -1,4 +1,4 @@
-.PHONY: help up down seed api executor risk reports bot web dev
+.PHONY: help up down seed api executor risk reports bot dev
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?##' \
@@ -28,8 +28,5 @@ reports: ## run Go reporting service
 bot: ## run Python bot locally
 	cd bots/python/samples && python main.py
 
-web: ## run dashboard dev server
-	npm --prefix apps/dashboard run dev
-
 dev: ## create dev container
-	docker compose up dev-env
+       docker compose up dev-env
