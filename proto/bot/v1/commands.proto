@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package qubit.bot.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qubit-bot-platform/proto/bot/v1;botv1";
+
+// BotCommandEnvelope is published on the `bot.commands` topic and
+// contains start/stop/rollout directives for a single bot runtime.
+message BotCommandEnvelope {
+  string command_id = 1;
+  string bot_id = 2;
+  string account_id = 3;
+  google.protobuf.Timestamp issued_at = 4;
+  // Optional request-scoped correlation id for tracing.
+  string correlation_id = 5;
+  oneof payload {
+    StartCommand start = 10;
+    StopCommand stop = 11;
+    RolloutCommand rollout = 12;
+  }
+}
+
+// StartCommand instructs a bot runner to launch the bot with
+// the specified image and configuration revision.
+message StartCommand {
+  string image = 1;
+  uint32 config_revision = 2;
+  google.protobuf.Timestamp effective_at = 3;
+  map<string, string> runtime_overrides = 4;
+}
+
+// StopCommand instructs a bot to halt operations gracefully or immediately.
+message StopCommand {
+  StopMode mode = 1;
+  google.protobuf.Duration timeout = 2;
+  string reason = 3;
+}
+
+// RolloutCommand instructs a running bot to reload configuration or
+// switch to a new image without a full restart if supported.
+message RolloutCommand {
+  string image = 1;
+  uint32 config_revision = 2;
+  map<string, string> runtime_overrides = 3;
+}
+
+// StopMode distinguishes between graceful and forceful shutdowns.
+enum StopMode {
+  STOP_MODE_UNSPECIFIED = 0;
+  STOP_MODE_GRACEFUL = 1;
+  STOP_MODE_FORCE = 2;
+}

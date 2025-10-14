@@ -1,0 +1,9 @@
+go 1.22.2
+
+use (
+./apps/supervisor
+./apps/executor
+./apps/risk
+./apps/reports
+./libs/go/platform
+)
