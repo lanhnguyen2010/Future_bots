@@ -1,0 +1,120 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Risk API",
+    "version": "0.1.0",
+    "description": "HTTP API for evaluating trading risk requests."
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Service liveness probe",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Service readiness probe",
+        "responses": {
+          "200": {
+            "description": "Service is ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/risk/evaluate": {
+      "post": {
+        "summary": "Evaluate a proposed order against risk controls",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiskCheckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Risk decision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskCheckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Status": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "RiskCheckRequest": {
+        "type": "object",
+        "required": ["bot_id", "account_id", "symbol", "proposed_side", "proposed_qty"],
+        "properties": {
+          "bot_id": {"type": "string"},
+          "account_id": {"type": "string"},
+          "symbol": {"type": "string"},
+          "proposed_side": {"type": "string", "enum": ["buy", "sell"]},
+          "proposed_qty": {"type": "number"}
+        }
+      },
+      "RiskCheckResponse": {
+        "type": "object",
+        "properties": {
+          "allowed": {"type": "boolean"},
+          "reason": {"type": "string"},
+          "checked_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}

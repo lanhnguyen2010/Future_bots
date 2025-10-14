@@ -62,3 +62,7 @@ Additional details are documented in the architecture guide.
 ## Database Migrations
 
 Each Go service ships with lightweight SQL migrations organised under `internal/migrations/sql` using the same naming convention as [golang-migrate](https://github.com/golang-migrate/migrate) (`0001_description.up.sql` / `0001_description.down.sql`). The shared `libs/go/platform/db` helper loads these embedded files at startup. Set the corresponding `*_DATABASE_URL` environment variable (e.g. `SUPERVISOR_DATABASE_URL`) before starting a service to apply migrations automatically. The optional `*_DATABASE_DRIVER` variable defaults to `pgx`, allowing teams to point at TimescaleDB or any Postgres-compatible database. The migrations remain CLI-compatible, so teams can also run `golang-migrate` manually against the same files when operating outside the services.
+
+## API Documentation
+
+The Supervisor, Executor, Risk, and Reports services now expose OpenAPI 3.0 specifications along with an embedded Swagger UI. When running any service locally, visit `http://localhost:<port>/docs` to browse interactive documentation, or fetch the machine-readable contract at `/openapi.json` for client generation.

@@ -1,0 +1,152 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Executor API",
+    "version": "0.1.0",
+    "description": "HTTP API for accepting order intents and reporting execution state."
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Service liveness probe",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Service readiness probe",
+        "responses": {
+          "200": {
+            "description": "Service is ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders": {
+      "post": {
+        "summary": "Submit a new order intent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderIntent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Order accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid order intent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orders/{order_id}": {
+      "get": {
+        "summary": "Fetch the latest status for a specific order",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Status": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "OrderIntent": {
+        "type": "object",
+        "required": ["bot_id", "symbol", "side", "quantity"],
+        "properties": {
+          "bot_id": {"type": "string"},
+          "symbol": {"type": "string"},
+          "side": {"type": "string", "enum": ["buy", "sell"]},
+          "quantity": {"type": "number"},
+          "price": {"type": "number"}
+        }
+      },
+      "OrderStatus": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "bot_id": {"type": "string"},
+          "symbol": {"type": "string"},
+          "side": {"type": "string"},
+          "quantity": {"type": "number"},
+          "price": {"type": "number"},
+          "status": {"type": "string"},
+          "updated_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}

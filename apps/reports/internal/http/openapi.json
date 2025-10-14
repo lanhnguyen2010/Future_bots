@@ -1,0 +1,111 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Reports API",
+    "version": "0.1.0",
+    "description": "HTTP API for retrieving reporting and analytics data."
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Service liveness probe",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Service readiness probe",
+        "responses": {
+          "200": {
+            "description": "Service is ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/pnl": {
+      "get": {
+        "summary": "Retrieve a profit and loss report",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bot_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1d"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PnL report payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PnLReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Status": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "PnLReport": {
+        "type": "object",
+        "properties": {
+          "account_id": {"type": "string"},
+          "bot_id": {"type": "string"},
+          "realized": {"type": "number"},
+          "unrealized": {"type": "number"},
+          "window": {"type": "string"},
+          "generated_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}

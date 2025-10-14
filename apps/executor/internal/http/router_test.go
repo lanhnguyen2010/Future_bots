@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -22,6 +23,27 @@ func TestHealthEndpoints(t *testing.T) {
 		router.ServeHTTP(rr, req)
 		if rr.Code != http.StatusOK {
 			t.Fatalf("%s expected status 200 got %d", path, rr.Code)
+		}
+	}
+}
+
+func TestDocsEndpoints(t *testing.T) {
+	router := NewRouter(newTestLogger())
+	for _, tt := range []struct {
+		path        string
+		contentType string
+	}{
+		{path: "/openapi.json", contentType: "application/json"},
+		{path: "/docs", contentType: "text/html; charset=utf-8"},
+	} {
+		req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("%s expected status 200 got %d", tt.path, rr.Code)
+		}
+		if ct := rr.Header().Get("Content-Type"); !strings.HasPrefix(ct, tt.contentType) {
+			t.Fatalf("%s expected content type %s got %s", tt.path, tt.contentType, ct)
 		}
 	}
 }

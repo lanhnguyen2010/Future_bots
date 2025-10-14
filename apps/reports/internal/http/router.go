@@ -22,6 +22,9 @@ type PnLReport struct {
 func NewRouter(logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("GET /openapi.json", serveOpenAPI)
+	mux.HandleFunc("GET /docs", serveDocs)
+
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
