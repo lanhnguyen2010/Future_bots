@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS desired_bots (
+    bot_id UUID PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    image TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    config JSONB NOT NULL,
+    config_rev INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

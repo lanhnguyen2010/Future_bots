@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package qubit.orders.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+option go_package = "github.com/qubit-bot-platform/proto/orders/v1;ordersv1";
+
+// OrderIntent represents an order request emitted by a trading bot
+// to the trade executor service on the `orders.intent` Kafka topic.
+message OrderIntent {
+  // Unique identifier assigned by the bot runtime.
+  string intent_id = 1;
+  // Immutable bot identifier.
+  string bot_id = 2;
+  // Account identifier used for routing and authorization.
+  string account_id = 3;
+  // Market symbol for the instrument being traded (e.g. VN30F1M).
+  string symbol = 4;
+  // Side of the trade (buy or sell).
+  OrderSide side = 5;
+  // Requested quantity in instrument units.
+  double quantity = 6;
+  // Optional price for limit orders. Not set for market orders.
+  google.protobuf.DoubleValue limit_price = 7;
+  // Order type describing how the order should be executed.
+  OrderType type = 8;
+  // Optional time in force instruction (e.g. GTC, IOC, FOK).
+  string time_in_force = 9;
+  // Deadline requested by the bot for the order to be processed.
+  google.protobuf.Timestamp expires_at = 10;
+  // Monotonically increasing sequence number per bot + account pair
+  // enabling idempotent execution.
+  uint64 sequence = 11;
+  // Free-form metadata for downstream auditing or debugging.
+  map<string, string> annotations = 12;
+}
+
+// OrderIntentAck is published by the executor on the orders.event topic
+// to confirm receipt of an intent before processing.
+message OrderIntentAck {
+  string intent_id = 1;
+  string executor_order_id = 2;
+  google.protobuf.Timestamp received_at = 3;
+}
+
+// ExecutionFill captures a partial or complete fill event for an order.
+message ExecutionFill {
+  string intent_id = 1;
+  string executor_order_id = 2;
+  string provider_order_id = 3;
+  double filled_quantity = 4;
+  double remaining_quantity = 5;
+  double fill_price = 6;
+  double fee_paid = 7;
+  google.protobuf.Timestamp filled_at = 8;
+}
+
+// OrderRejection is emitted when the risk engine or broker rejects an intent.
+message OrderRejection {
+  string intent_id = 1;
+  string executor_order_id = 2;
+  // Human readable reason.
+  string reason = 3;
+  // Machine friendly rejection category.
+  RejectionReason category = 4;
+  google.protobuf.Timestamp rejected_at = 5;
+}
+
+// OrderCancel notifies a bot that an order was cancelled prior to execution.
+message OrderCancel {
+  string intent_id = 1;
+  string executor_order_id = 2;
+  string initiated_by = 3; // bot|risk|broker|system
+  google.protobuf.Timestamp cancelled_at = 4;
+}
+
+// OrderEvent is the envelope that appears on the orders.event topic.
+message OrderEvent {
+  oneof event {
+    OrderIntentAck ack = 1;
+    ExecutionFill fill = 2;
+    OrderRejection rejection = 3;
+    OrderCancel cancel = 4;
+  }
+  // Bot + account used to route the message.
+  string bot_id = 20;
+  string account_id = 21;
+  // Correlation identifier for tracing.
+  string correlation_id = 22;
+  google.protobuf.Timestamp published_at = 23;
+}
+
+// OrderSide enumerates available sides for an order intent.
+enum OrderSide {
+  ORDER_SIDE_UNSPECIFIED = 0;
+  ORDER_SIDE_BUY = 1;
+  ORDER_SIDE_SELL = 2;
+}
+
+// OrderType enumerates supported order types.
+enum OrderType {
+  ORDER_TYPE_UNSPECIFIED = 0;
+  ORDER_TYPE_MARKET = 1;
+  ORDER_TYPE_LIMIT = 2;
+  ORDER_TYPE_STOP = 3;
+}
+
+// RejectionReason describes broad categories of order rejection events.
+enum RejectionReason {
+  REJECTION_REASON_UNSPECIFIED = 0;
+  REJECTION_REASON_RISK_LIMIT = 1;
+  REJECTION_REASON_INSTRUMENT_HALTED = 2;
+  REJECTION_REASON_BROKER_REJECT = 3;
+  REJECTION_REASON_TIMEOUT = 4;
+  REJECTION_REASON_SYSTEM_ERROR = 5;
+}

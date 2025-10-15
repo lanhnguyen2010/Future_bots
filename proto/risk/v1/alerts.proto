@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package qubit.risk.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qubit-bot-platform/proto/risk/v1;riskv1";
+
+// RiskAlert is broadcast on the `risk.alerts` topic to notify stakeholders
+// that a risk threshold or policy breach has occurred.
+message RiskAlert {
+  string alert_id = 1;
+  string account_id = 2;
+  string bot_id = 3;
+  RiskAlertType type = 4;
+  Severity severity = 5;
+  string message = 6;
+  // Structured context for programmatic processing (e.g. limits).
+  map<string, string> context = 7;
+  google.protobuf.Timestamp observed_at = 8;
+  google.protobuf.Timestamp published_at = 9;
+  string correlation_id = 10;
+}
+
+// RiskAlertType enumerates the primary classes of alerts emitted.
+enum RiskAlertType {
+  RISK_ALERT_TYPE_UNSPECIFIED = 0;
+  RISK_ALERT_TYPE_LIMIT_BREACH = 1;
+  RISK_ALERT_TYPE_LOSS_CAP = 2;
+  RISK_ALERT_TYPE_LEVERAGE = 3;
+  RISK_ALERT_TYPE_SYMBOL_BLOCKED = 4;
+  RISK_ALERT_TYPE_SYSTEM = 5;
+}
+
+// Severity allows alert consumers to prioritize remediation.
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_INFO = 1;
+  SEVERITY_WARNING = 2;
+  SEVERITY_CRITICAL = 3;
+}

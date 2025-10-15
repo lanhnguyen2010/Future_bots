@@ -1,0 +1,205 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Supervisor API",
+    "version": "0.1.0",
+    "description": "HTTP API for managing bot desired state and issuing runtime commands."
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Service liveness probe",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Service readiness probe",
+        "responses": {
+          "200": {
+            "description": "Service is ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bots": {
+      "get": {
+        "summary": "List desired bot configurations",
+        "responses": {
+          "200": {
+            "description": "Collection of bot summaries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BotSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create or update a bot desired state",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertBotRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Operation accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bots/{bot_id}/commands": {
+      "post": {
+        "summary": "Send an operational command to a bot",
+        "parameters": [
+          {
+            "name": "bot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Command accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Status": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "BotSummary": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "account_id": {"type": "string"},
+          "name": {"type": "string"},
+          "image": {"type": "string"},
+          "enabled": {"type": "boolean"},
+          "config_rev": {"type": "integer"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "phase": {"type": "string"},
+          "description": {"type": "string"}
+        }
+      },
+      "UpsertBotRequest": {
+        "type": "object",
+        "required": ["id", "account_id", "name", "image", "config"],
+        "properties": {
+          "id": {"type": "string"},
+          "account_id": {"type": "string"},
+          "name": {"type": "string"},
+          "image": {"type": "string"},
+          "enabled": {"type": "boolean"},
+          "config": {"type": "object"}
+        }
+      },
+      "CommandRequest": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {"type": "string"},
+          "timeout_ms": {"type": "integer", "minimum": 0}
+        }
+      }
+    }
+  }
+}
