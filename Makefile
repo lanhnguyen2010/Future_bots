@@ -4,8 +4,8 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?##' \
 		$(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
-up: ## docker compose up Timescale+Redis
-	docker compose up -d timescale redis
+up: ## docker compose up Timescale, Redis, Kafka stack
+	docker compose up -d timescale redis zookeeper kafka kafka-ui
 
 down: ## compose down -v
 	docker compose down -v
@@ -29,4 +29,4 @@ bot: ## run Python bot locally
 	cd bots/python/samples && python main.py
 
 dev: ## create dev container
-       docker compose up dev-env
+	docker compose up dev-env

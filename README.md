@@ -36,7 +36,7 @@ This repository houses the full system design and scaffolding for the Qubit Bot 
 
 Run `make help` to see available commands. Key targets include:
 
-- `make up` – start TimescaleDB and Redis via Docker Compose.
+- `make up` – start TimescaleDB, Redis, Kafka, and Kafka UI via Docker Compose.
 - `make seed` – apply core schemas to the Timescale database.
 - `make api` – run the Supervisor/Executor Go services locally.
 - `make bot` – execute a Python bot using the SDK runner.
@@ -49,6 +49,27 @@ order intents, execution events, risk alerts, and supervisor bot commands. Use
 `protoc` (the dev container ships with the compiler) to generate language
 bindings for services and bots. See [`proto/README.md`](proto/README.md) for
 details and sample commands.
+
+## Local Runtime Options
+
+### Docker Compose
+
+The root [`docker-compose.yml`](docker-compose.yml) provisions the platform
+dependencies—TimescaleDB, Redis, Kafka/ZooKeeper, and the Kafka UI—along with a
+`dev-env` container that mirrors the repository's devcontainer image. Use the
+Makefile target above or run `docker compose up -d` manually to bring the stack
+online. Default credentials match the documentation: `qubit`/`qubit` for the
+database and plaintext listeners on `localhost:9092` and `localhost:9094` for
+Kafka.
+
+### Minikube Deployment
+
+For a lightweight Kubernetes install, execute
+[`scripts/deploy_minikube.sh`](scripts/deploy_minikube.sh). The script starts (or
+reuses) a `qubit-bots` Minikube profile, ensures the `trading` namespace exists,
+and applies the manifests in [`infra/k8s`](infra/k8s). Override CPU, memory, or
+namespace defaults by exporting `MINIKUBE_CPUS`, `MINIKUBE_MEMORY`, or
+`K8S_NAMESPACE` before running the script.
 
 ## Dev Container
 
