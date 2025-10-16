@@ -1,0 +1,21 @@
+# General artifacts
+.DS_Store
+*.log
+*.tmp
+*.swp
+
+# Build outputs
+bin/
+dist/
+*.out
+*.exe
+*.test
+
+# Go tooling caches
+.gocache/
+coverage/
+
+# IDE/editor files
+.idea/
+.vscode/
+*.code-workspace

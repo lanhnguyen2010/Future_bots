@@ -8,14 +8,25 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/future-bots/reports/internal/repository"
+	"github.com/future-bots/reports/internal/service"
 )
 
 func newTestLogger() *slog.Logger {
 	return slog.New(slog.NewJSONHandler(io.Discard, nil))
 }
 
+func newTestRouter(t *testing.T) http.Handler {
+	t.Helper()
+	repo := repository.NewMemory(0, 0)
+	svc := service.New(repo, "", func() time.Time { return time.Unix(0, 0).UTC() })
+	return NewRouter(newTestLogger(), svc)
+}
+
 func TestHealthEndpoints(t *testing.T) {
-	router := NewRouter(newTestLogger())
+	router := newTestRouter(t)
 	for _, path := range []string{"/healthz", "/readyz"} {
 		rr := httptest.NewRecorder()
 		router.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, path, nil))
@@ -26,7 +37,7 @@ func TestHealthEndpoints(t *testing.T) {
 }
 
 func TestDocsEndpoints(t *testing.T) {
-	router := NewRouter(newTestLogger())
+	router := newTestRouter(t)
 	for _, tt := range []struct {
 		path        string
 		contentType string
@@ -46,7 +57,7 @@ func TestDocsEndpoints(t *testing.T) {
 }
 
 func TestPnLReportEndpoint(t *testing.T) {
-	router := NewRouter(newTestLogger())
+	router := newTestRouter(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/reports/pnl?account_id=acct-1&bot_id=bot-1", nil)
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
@@ -54,7 +65,7 @@ func TestPnLReportEndpoint(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200 got %d", rr.Code)
 	}
-	var report PnLReport
+	var report service.PnLReport
 	if err := json.Unmarshal(rr.Body.Bytes(), &report); err != nil {
 		t.Fatalf("failed to decode report: %v", err)
 	}
@@ -64,7 +75,7 @@ func TestPnLReportEndpoint(t *testing.T) {
 }
 
 func TestPnLReportDefaultAccount(t *testing.T) {
-	router := NewRouter(newTestLogger())
+	router := newTestRouter(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/reports/pnl", nil)
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
@@ -72,7 +83,7 @@ func TestPnLReportDefaultAccount(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200 got %d", rr.Code)
 	}
-	var report PnLReport
+	var report service.PnLReport
 	if err := json.Unmarshal(rr.Body.Bytes(), &report); err != nil {
 		t.Fatalf("failed to decode report: %v", err)
 	}

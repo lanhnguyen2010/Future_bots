@@ -2,31 +2,16 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/future-bots/platform/httpx"
+	"github.com/future-bots/risk/internal/service"
 )
 
-// RiskCheckRequest represents a request to evaluate a risk exposure.
-type RiskCheckRequest struct {
-	BotID        string  `json:"bot_id"`
-	AccountID    string  `json:"account_id"`
-	Symbol       string  `json:"symbol"`
-	ProposedSide string  `json:"proposed_side"`
-	ProposedQty  float64 `json:"proposed_qty"`
-}
-
-// RiskCheckResponse holds the risk decision for a given request.
-type RiskCheckResponse struct {
-	Allowed   bool      `json:"allowed"`
-	Reason    string    `json:"reason"`
-	CheckedAt time.Time `json:"checked_at"`
-}
-
 // NewRouter creates the risk HTTP API routes.
-func NewRouter(logger *slog.Logger) http.Handler {
+func NewRouter(logger *slog.Logger, svc service.Service) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /openapi.json", serveOpenAPI)
@@ -41,32 +26,27 @@ func NewRouter(logger *slog.Logger) http.Handler {
 	})
 
 	mux.HandleFunc("POST /api/v1/risk/evaluate", func(w http.ResponseWriter, r *http.Request) {
-		var req RiskCheckRequest
+		var req service.RiskCheckRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			logger.Error("invalid risk evaluation request", "error", err)
 			httpx.Error(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
-		decision := evaluate(req)
+		decision, err := svc.Evaluate(r.Context(), req)
+		if err != nil {
+			if errors.Is(err, service.ErrInvalidQuantity) {
+				httpx.Error(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			logger.Error("risk evaluation failed", "error", err)
+			httpx.Error(w, http.StatusInternalServerError, "failed to evaluate risk")
+			return
+		}
+
 		logger.Info("risk decision computed", "bot_id", req.BotID, "allowed", decision.Allowed)
 		httpx.JSON(w, http.StatusOK, decision)
 	})
 
 	return mux
-}
-
-func evaluate(req RiskCheckRequest) RiskCheckResponse {
-	// Placeholder evaluation logic. Real implementation will inspect exposure
-	// limits, PnL, and other guardrails. For now, reject orders above 10 lots.
-	allowed := req.ProposedQty <= 10
-	response := RiskCheckResponse{
-		Allowed:   allowed,
-		Reason:    "",
-		CheckedAt: time.Now().UTC(),
-	}
-	if !allowed {
-		response.Reason = "quantity exceeds maximum lot size"
-	}
-	return response
 }
