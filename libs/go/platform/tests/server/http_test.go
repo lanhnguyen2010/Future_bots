@@ -1,4 +1,4 @@
-package server
+package server_test
 
 import (
 	"context"
@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"testing"
 	"time"
+
+	platformserver "github.com/future-bots/platform/server"
 )
 
 func TestRunReturnsErrorWhenHandlerNil(t *testing.T) {
-	err := Run(context.Background(), nil, Config{}, nil)
+	err := platformserver.Run(context.Background(), nil, platformserver.Config{}, nil)
 	if err == nil {
 		t.Fatalf("expected error when handler nil")
 	}
@@ -26,10 +28,10 @@ func TestRunGracefulShutdown(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	cfg := Config{Addr: "localhost:0", ShutdownTimeout: 500 * time.Millisecond}
+	cfg := platformserver.Config{Addr: "localhost:0", ShutdownTimeout: 500 * time.Millisecond}
 	logger := slog.New(slog.NewTextHandler(new(noopWriter), nil))
 
-	if err := Run(ctx, handler, cfg, logger); err != nil {
+	if err := platformserver.Run(ctx, handler, cfg, logger); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 }

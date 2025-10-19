@@ -11,6 +11,7 @@ import (
 	"github.com/future-bots/platform/config"
 	platformdb "github.com/future-bots/platform/db"
 	"github.com/future-bots/platform/server"
+	"github.com/future-bots/supervisor/internal/bots"
 	"github.com/future-bots/supervisor/internal/http"
 	"github.com/future-bots/supervisor/internal/migrations"
 )
@@ -23,7 +24,13 @@ func main() {
 	addr := config.EnvOrDefault("SUPERVISOR_ADDR", ":8080")
 	shutdownTimeout := config.DurationFromEnv("SUPERVISOR_SHUTDOWN_TIMEOUT", 10*time.Second)
 
-	handler := http.NewRouter(logger)
+	manifestDir := config.EnvOrDefault("SUPERVISOR_BOT_MANIFEST_DIR", "infra/k8s/bots")
+
+	repo := bots.NewMemoryRepository()
+	writer := bots.NewFileManifestWriter(manifestDir)
+	service := bots.NewService(repo, writer, logger)
+
+	handler := http.NewRouter(logger, service)
 
 	if dsn := os.Getenv("SUPERVISOR_DATABASE_URL"); dsn != "" {
 		driverName := config.EnvOrDefault("SUPERVISOR_DATABASE_DRIVER", "pgx")

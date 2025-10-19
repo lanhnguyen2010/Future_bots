@@ -1,25 +1,27 @@
-package service
+package service_test
 
 import (
 	"context"
 	"testing"
 	"time"
+
+	reportsvc "github.com/future-bots/reports/internal/service"
 )
 
 type stubRepo struct {
-	data PnLData
+	data reportsvc.PnLData
 	err  error
 }
 
-func (s stubRepo) FetchPnL(context.Context, string, string, string) (PnLData, error) {
+func (s stubRepo) FetchPnL(context.Context, string, string, string) (reportsvc.PnLData, error) {
 	return s.data, s.err
 }
 
 func TestGeneratePnLReportUsesDefaults(t *testing.T) {
-	repo := stubRepo{data: PnLData{Realized: 10, Unrealized: 5}}
-	svc := New(repo, "", func() time.Time { return time.Unix(0, 0).UTC() })
+	repo := stubRepo{data: reportsvc.PnLData{Realized: 10, Unrealized: 5}}
+	svc := reportsvc.New(repo, "", func() time.Time { return time.Unix(0, 0).UTC() })
 
-	report, err := svc.GeneratePnLReport(context.Background(), PnLQuery{})
+	report, err := svc.GeneratePnLReport(context.Background(), reportsvc.PnLQuery{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -38,10 +40,10 @@ func TestGeneratePnLReportUsesDefaults(t *testing.T) {
 }
 
 func TestGeneratePnLReportRespectsQuery(t *testing.T) {
-	repo := stubRepo{data: PnLData{Realized: 20, Unrealized: 8}}
-	svc := New(repo, "", func() time.Time { return time.Unix(0, 0).UTC() })
+	repo := stubRepo{data: reportsvc.PnLData{Realized: 20, Unrealized: 8}}
+	svc := reportsvc.New(repo, "", func() time.Time { return time.Unix(0, 0).UTC() })
 
-	report, err := svc.GeneratePnLReport(context.Background(), PnLQuery{AccountID: "acct-x", BotID: "bot-1", Window: "1w"})
+	report, err := svc.GeneratePnLReport(context.Background(), reportsvc.PnLQuery{AccountID: "acct-x", BotID: "bot-1", Window: "1w"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

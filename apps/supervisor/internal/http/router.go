@@ -1,36 +1,25 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/future-bots/platform/httpx"
+	"github.com/future-bots/supervisor/internal/bots"
 )
-
-// BotSummary represents a condensed view of a trading bot.
-type BotSummary struct {
-	ID          string    `json:"id"`
-	AccountID   string    `json:"account_id"`
-	Name        string    `json:"name"`
-	Image       string    `json:"image"`
-	Enabled     bool      `json:"enabled"`
-	ConfigRev   int       `json:"config_rev"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	Phase       string    `json:"phase"`
-	Description string    `json:"description"`
-}
 
 // UpsertBotRequest models the payload used to create or update a bot desired state.
 type UpsertBotRequest struct {
-	ID        string          `json:"id"`
-	AccountID string          `json:"account_id"`
-	Name      string          `json:"name"`
-	Image     string          `json:"image"`
-	Enabled   bool            `json:"enabled"`
-	Config    json.RawMessage `json:"config"`
+	ID          string          `json:"id"`
+	AccountID   string          `json:"account_id"`
+	Name        string          `json:"name"`
+	Image       string          `json:"image"`
+	Enabled     bool            `json:"enabled"`
+	Config      json.RawMessage `json:"config"`
+	Description string          `json:"description"`
 }
 
 // CommandRequest represents a start/stop command sent from the dashboard.
@@ -39,8 +28,14 @@ type CommandRequest struct {
 	Timeout int    `json:"timeout_ms"`
 }
 
+// BotService abstracts bot operations required by the HTTP layer.
+type BotService interface {
+	ListBots(ctx context.Context) ([]bots.Bot, error)
+	UpsertBot(ctx context.Context, input bots.UpsertInput) (bots.Bot, error)
+}
+
 // NewRouter wires supervisor specific HTTP handlers.
-func NewRouter(logger *slog.Logger) http.Handler {
+func NewRouter(logger *slog.Logger, svc BotService) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /openapi.json", serveOpenAPI)
@@ -55,8 +50,13 @@ func NewRouter(logger *slog.Logger) http.Handler {
 	})
 
 	mux.HandleFunc("GET /api/v1/bots", func(w http.ResponseWriter, r *http.Request) {
-		bots := sampleBots()
-		httpx.JSON(w, http.StatusOK, map[string]any{"items": bots})
+		items, err := svc.ListBots(r.Context())
+		if err != nil {
+			logger.Error("failed to list bots", "error", err)
+			httpx.Error(w, http.StatusInternalServerError, "failed to list bots")
+			return
+		}
+		httpx.JSON(w, http.StatusOK, map[string]any{"items": items})
 	})
 
 	mux.HandleFunc("POST /api/v1/bots", func(w http.ResponseWriter, r *http.Request) {
@@ -66,12 +66,25 @@ func NewRouter(logger *slog.Logger) http.Handler {
 			httpx.Error(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
-		if strings.TrimSpace(payload.ID) == "" {
-			httpx.Error(w, http.StatusBadRequest, "id is required")
+		bot, err := svc.UpsertBot(r.Context(), bots.UpsertInput{
+			ID:          payload.ID,
+			AccountID:   payload.AccountID,
+			Name:        payload.Name,
+			Image:       payload.Image,
+			Enabled:     payload.Enabled,
+			Config:      payload.Config,
+			Description: payload.Description,
+		})
+		if err != nil {
+			status := http.StatusInternalServerError
+			if errors.Is(err, bots.ErrValidation) {
+				status = http.StatusBadRequest
+			}
+			logger.Error("failed to upsert bot", "bot_id", payload.ID, "error", err)
+			httpx.Error(w, status, err.Error())
 			return
 		}
-		logger.Info("received bot upsert request", "bot_id", payload.ID, "enabled", payload.Enabled)
-		httpx.JSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
+		httpx.JSON(w, http.StatusAccepted, bot)
 	})
 
 	mux.HandleFunc("POST /api/v1/bots/{bot_id}/commands", func(w http.ResponseWriter, r *http.Request) {
@@ -91,20 +104,4 @@ func NewRouter(logger *slog.Logger) http.Handler {
 	})
 
 	return mux
-}
-
-func sampleBots() []BotSummary {
-	return []BotSummary{
-		{
-			ID:          "bot-1",
-			AccountID:   "acct-123",
-			Name:        "mean-reversion-alpha",
-			Image:       "registry.example.com/bots/mean-reversion:1.2.3",
-			Enabled:     true,
-			ConfigRev:   3,
-			UpdatedAt:   time.Now().UTC(),
-			Phase:       "running",
-			Description: "Example bot placeholder",
-		},
-	}
 }

@@ -1,4 +1,4 @@
-package http
+package http_test
 
 import (
 	"bytes"
@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
-	"net/http"
+	stdhttp "net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	executorhttp "github.com/future-bots/executor/internal/http"
 	"github.com/future-bots/executor/internal/repository"
 	"github.com/future-bots/executor/internal/service"
 )
@@ -20,20 +21,20 @@ func newTestLogger() *slog.Logger {
 	return slog.New(slog.NewJSONHandler(io.Discard, nil))
 }
 
-func newTestRouter(t *testing.T) (http.Handler, *repository.Memory) {
+func newTestRouter(t *testing.T) (stdhttp.Handler, *repository.Memory) {
 	t.Helper()
 	repo := repository.NewMemory()
 	svc := service.New(repo, func() time.Time { return time.Unix(0, 0).UTC() })
-	return NewRouter(newTestLogger(), svc), repo
+	return executorhttp.NewRouter(newTestLogger(), svc), repo
 }
 
 func TestHealthEndpoints(t *testing.T) {
 	router, _ := newTestRouter(t)
 	for _, path := range []string{"/healthz", "/readyz"} {
-		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req := httptest.NewRequest(stdhttp.MethodGet, path, nil)
 		rr := httptest.NewRecorder()
 		router.ServeHTTP(rr, req)
-		if rr.Code != http.StatusOK {
+		if rr.Code != stdhttp.StatusOK {
 			t.Fatalf("%s expected status 200 got %d", path, rr.Code)
 		}
 	}
@@ -48,10 +49,10 @@ func TestDocsEndpoints(t *testing.T) {
 		{path: "/openapi.json", contentType: "application/json"},
 		{path: "/docs", contentType: "text/html; charset=utf-8"},
 	} {
-		req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+		req := httptest.NewRequest(stdhttp.MethodGet, tt.path, nil)
 		rr := httptest.NewRecorder()
 		router.ServeHTTP(rr, req)
-		if rr.Code != http.StatusOK {
+		if rr.Code != stdhttp.StatusOK {
 			t.Fatalf("%s expected status 200 got %d", tt.path, rr.Code)
 		}
 		if ct := rr.Header().Get("Content-Type"); !strings.HasPrefix(ct, tt.contentType) {
@@ -64,24 +65,24 @@ func TestCreateOrderValidations(t *testing.T) {
 	router, _ := newTestRouter(t)
 
 	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/v1/orders", bytes.NewBufferString("{")))
-	if rr.Code != http.StatusBadRequest {
+	router.ServeHTTP(rr, httptest.NewRequest(stdhttp.MethodPost, "/api/v1/orders", bytes.NewBufferString("{")))
+	if rr.Code != stdhttp.StatusBadRequest {
 		t.Fatalf("expected 400 for malformed payload got %d", rr.Code)
 	}
 
 	invalid := service.OrderIntent{BotID: " ", Symbol: "", Side: "hold", Quantity: -1}
 	body, _ := json.Marshal(invalid)
 	rr = httptest.NewRecorder()
-	router.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/v1/orders", bytes.NewReader(body)))
-	if rr.Code != http.StatusBadRequest {
+	router.ServeHTTP(rr, httptest.NewRequest(stdhttp.MethodPost, "/api/v1/orders", bytes.NewReader(body)))
+	if rr.Code != stdhttp.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid payload got %d", rr.Code)
 	}
 
 	valid := service.OrderIntent{BotID: "bot-1", Symbol: "VN30F1M", Side: "buy", Quantity: 1, Price: 1400}
 	body, _ = json.Marshal(valid)
 	rr = httptest.NewRecorder()
-	router.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/v1/orders", bytes.NewReader(body)))
-	if rr.Code != http.StatusAccepted {
+	router.ServeHTTP(rr, httptest.NewRequest(stdhttp.MethodPost, "/api/v1/orders", bytes.NewReader(body)))
+	if rr.Code != stdhttp.StatusAccepted {
 		t.Fatalf("expected 202 for valid payload got %d", rr.Code)
 	}
 	var status service.Order
@@ -110,11 +111,11 @@ func TestGetOrderStatus(t *testing.T) {
 		t.Fatalf("failed to seed repository: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/orders/ord-123", nil)
+	req := httptest.NewRequest(stdhttp.MethodGet, "/api/v1/orders/ord-123", nil)
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
+	if rr.Code != stdhttp.StatusOK {
 		t.Fatalf("expected 200 got %d", rr.Code)
 	}
 	var status service.Order
@@ -128,11 +129,11 @@ func TestGetOrderStatus(t *testing.T) {
 
 func TestGetOrderNotFound(t *testing.T) {
 	router, _ := newTestRouter(t)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/orders/missing", nil)
+	req := httptest.NewRequest(stdhttp.MethodGet, "/api/v1/orders/missing", nil)
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusNotFound {
+	if rr.Code != stdhttp.StatusNotFound {
 		t.Fatalf("expected 404 got %d", rr.Code)
 	}
 }

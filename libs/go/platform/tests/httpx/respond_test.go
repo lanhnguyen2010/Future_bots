@@ -1,16 +1,18 @@
-package httpx
+package httpx_test
 
 import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	platformhttpx "github.com/future-bots/platform/httpx"
 )
 
 func TestJSONWritesPayload(t *testing.T) {
 	rr := httptest.NewRecorder()
 	payload := map[string]string{"status": "ok"}
-	JSON(rr, http.StatusCreated, payload)
+	platformhttpx.JSON(rr, http.StatusCreated, payload)
 
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("expected status %d got %d", http.StatusCreated, rr.Code)
@@ -29,7 +31,7 @@ func TestJSONWritesPayload(t *testing.T) {
 
 func TestJSONHandlesNilPayload(t *testing.T) {
 	rr := httptest.NewRecorder()
-	JSON(rr, http.StatusNoContent, nil)
+	platformhttpx.JSON(rr, http.StatusNoContent, nil)
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status %d got %d", http.StatusNoContent, rr.Code)
 	}
@@ -40,7 +42,7 @@ func TestJSONHandlesNilPayload(t *testing.T) {
 
 func TestErrorWrapsMessage(t *testing.T) {
 	rr := httptest.NewRecorder()
-	Error(rr, http.StatusBadRequest, "boom")
+	platformhttpx.Error(rr, http.StatusBadRequest, "boom")
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d got %d", http.StatusBadRequest, rr.Code)
