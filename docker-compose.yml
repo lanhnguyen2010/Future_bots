@@ -27,7 +27,7 @@ services:
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli ping && redis-cli module list | grep -q timeseries"]
       interval: 10s
       timeout: 5s
       retries: 5

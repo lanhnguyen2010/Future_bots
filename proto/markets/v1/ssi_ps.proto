@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package markets.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/future-bots/proto/markets/v1;marketsv1";
+
+// SsiPsSnapshot captures a single SSI power-screen (Hose) market snapshot.
+message SsiPsSnapshot {
+  string board = 1;
+  string raw_symbol = 2;
+  string code = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  google.protobuf.Timestamp server_timestamp = 5;
+
+  double best_bid_1 = 6;
+  int64 best_bid_1_volume = 7;
+  double best_bid_2 = 8;
+  int64 best_bid_2_volume = 9;
+  double best_bid_3 = 10;
+  int64 best_bid_3_volume = 11;
+  double best_bid_4 = 12;
+  int64 best_bid_4_volume = 13;
+  double best_bid_5 = 14;
+  int64 best_bid_5_volume = 15;
+  double best_bid_6 = 16;
+  int64 best_bid_6_volume = 17;
+  double best_bid_7 = 18;
+  int64 best_bid_7_volume = 19;
+  double best_bid_8 = 20;
+  int64 best_bid_8_volume = 21;
+  double best_bid_9 = 22;
+  int64 best_bid_9_volume = 23;
+  double best_bid_10 = 24;
+  int64 best_bid_10_volume = 25;
+
+  double best_offer_1 = 26;
+  int64 best_offer_1_volume = 27;
+  double best_offer_2 = 28;
+  int64 best_offer_2_volume = 29;
+  double best_offer_3 = 30;
+  int64 best_offer_3_volume = 31;
+  double best_offer_4 = 32;
+  int64 best_offer_4_volume = 33;
+  double best_offer_5 = 34;
+  int64 best_offer_5_volume = 35;
+  double best_offer_6 = 36;
+  int64 best_offer_6_volume = 37;
+  double best_offer_7 = 38;
+  int64 best_offer_7_volume = 39;
+  double best_offer_8 = 40;
+  int64 best_offer_8_volume = 41;
+  double best_offer_9 = 42;
+  int64 best_offer_9_volume = 43;
+  double best_offer_10 = 44;
+  int64 best_offer_10_volume = 45;
+
+  double last_price = 46;
+  double highest_price = 47;
+  string instrument_type = 48;
+  double lowest_price = 49;
+
+  int64 foreigner_buy_volume = 50;
+  int64 foreigner_buy_value = 51;
+  int64 foreigner_sell_volume = 52;
+  int64 foreigner_sell_value = 53;
+
+  double change = 54;
+  int64 total_match_volume = 55;
+  int64 total_match_value = 56;
+  int64 total_bid_volume = 57;
+  int64 total_ask_volume = 58;
+  int64 open_interest = 59;
+
+  double ceiling_price = 60;
+  double floor_price = 61;
+  double reference_price = 62;
+
+  string expire_date = 63;
+  string session = 64;
+  string foreign_room = 65;
+  string group = 66;
+  int64 floating_shares = 67;
+}

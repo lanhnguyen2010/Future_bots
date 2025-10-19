@@ -1,5 +1,5 @@
 .RECIPEPREFIX := >
-.PHONY: help up down seed api executor risk reports bot dev
+.PHONY: help up down seed api executor risk reports bot dev marketdata-seed producer consumer
 
 help: ## Show this help message
 > @grep -E '^[a-zA-Z_-]+:.*?##' \
@@ -31,3 +31,12 @@ bot: ## run Python bot locally
 
 dev: ## create dev container
 > docker compose up dev-env
+
+marketdata-seed: ## seed sample market data into RedisTimeSeries
+> cd apps/reports && GOTOOLCHAIN=local go run ./cmd/seed-marketdata
+
+producer: ## parse SSI sample data and publish to Kafka topic
+> cd apps/producer && GOTOOLCHAIN=local go run ./cmd/producer
+
+consumer: ## consume Kafka snapshots and store in RedisTimeSeries
+> cd apps/consumer && GOTOOLCHAIN=local go run ./cmd/consumer

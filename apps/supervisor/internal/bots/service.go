@@ -13,25 +13,36 @@ import (
 
 // Service orchestrates bot persistence alongside manifest generation.
 type Service struct {
-	repo     Repository
-	writer   ManifestWriter
-	logger   *slog.Logger
-	timeFunc func() time.Time
+	repo      Repository
+	writer    ManifestWriter
+	telemetry Telemetry
+	logger    *slog.Logger
+	timeFunc  func() time.Time
 }
 
 // NewService constructs a bot service using the provided repository and manifest writer.
 func NewService(repo Repository, writer ManifestWriter, logger *slog.Logger) *Service {
 	return &Service{
-		repo:     repo,
-		writer:   writer,
-		logger:   logger,
-		timeFunc: func() time.Time { return time.Now().UTC() },
+		repo:      repo,
+		writer:    writer,
+		telemetry: TelemetryFunc(func(context.Context, Bot) error { return nil }),
+		logger:    logger,
+		timeFunc:  func() time.Time { return time.Now().UTC() },
 	}
 }
 
 // WithNow allows injecting deterministic time for tests.
 func (s *Service) WithNow(now func() time.Time) *Service {
 	s.timeFunc = now
+	return s
+}
+
+// WithTelemetry configures an optional telemetry sink for bot upsert events.
+func (s *Service) WithTelemetry(t Telemetry) *Service {
+	if t == nil {
+		t = TelemetryFunc(func(context.Context, Bot) error { return nil })
+	}
+	s.telemetry = t
 	return s
 }
 
@@ -93,6 +104,11 @@ func (s *Service) UpsertBot(ctx context.Context, input UpsertInput) (Bot, error)
 			return Bot{}, fmt.Errorf("write manifest: %w", err)
 		}
 	}
+
+	if err := s.telemetry.RecordBotUpsert(ctx, stored); err != nil {
+		s.logger.Warn("failed to record bot telemetry", "bot_id", stored.ID, "error", err)
+	}
+
 	return stored, nil
 }
 

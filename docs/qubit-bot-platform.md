@@ -142,6 +142,48 @@ CREATE TABLE IF NOT EXISTS bot_status(
 );
 ```
 
+### 2.3 RedisTimeSeries Market Data
+
+- The local Docker stack loads Redis with the RedisTimeSeries module enabled and
+  exposes it on `localhost:6379`.
+- `apps/reports/cmd/seed-marketdata` seeds canonical price/volume ticks under
+  keys `markets:<ticker>:price` and `markets:<ticker>:volume` (default ticker
+  `VN30F1M`). Trigger via `make marketdata-seed`.
+- Go services can record real ticks by wiring `platform/redis.NewMarketSeriesStore`
+  and calling `AddTick` with `MarketTick` structs (which automatically create the
+  underlying series with sensible retention windows).
+- Bots retrieve rolling windows using `RedisTimeSeriesMarketDataClient` from the
+  Python SDK, exposing both `fetch()` and `fetch_range(start, end)` for querying
+  the latest snapshot or intraday slices.
+
+### 2.4 Kafka Test Producer
+
+- `apps/producer` exposes an HTTP facade for injecting ad-hoc messages into Kafka.
+- Configure brokers via `PRODUCER_KAFKA_BROKERS` (defaults to `localhost:9092`) and
+  optionally set `PRODUCER_DEFAULT_TOPIC` for requests that omit the topic field.
+- Use `make producer` to run the service locally, then `POST /api/v1/messages`
+  with a JSON payload containing `value`, optional `key`, `headers`, and `topic`.
+
+### 2.5 Hose PowerScreen Topic
+
+- SSI PowerScreen ticks parsed by `HoseStockParser` are published to the `ssi_ps`
+  Kafka topic using the [`markets.v1.SsiPsSnapshot`](../proto/markets/v1/ssi_ps.proto)
+  schema.
+- Snapshot fields cover depth-of-book price levels, foreign flow statistics, and
+  metadata (board, raw symbol, session). Timestamps are normalised to the
+  exchange timezone (UTC+7).
+- Consumers should register the generated Protobuf schema with their Kafka client
+  (see `proto/README.md`) to ensure forward-compatible decoding.
+- `make producer` ingests the reference `.txt` samples in
+  `apps/producer/internal/data`, converts rows to protobuf messages, and flushes
+  them to the `ssi_ps` topic for local testing.
+- `make consumer` streams the same topic, decoding protobuf payloads and
+  storing each snapshot as JSON inside a Redis sorted set (`ssi_ps:<code>`)
+  while also mirroring the payload to a Redis Stream (`ssi_ps_stream:<code>`)
+  for realtime listeners. Downstream tools can issue `ZRANGEBYSCORE` queries to
+  obtain a dataframe of ticks. Environment knobs mirror the README
+  (`CONSUMER_*`).
+
 ## 3. Bot Runtime (Python) — Contract & Runner
 
 ### 3.1 Bot SDK Contract

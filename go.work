@@ -5,5 +5,8 @@ use (
 ./apps/executor
 ./apps/risk
 ./apps/reports
+./apps/producer
+./apps/consumer
 ./libs/go/platform
+./proto/gen/go
 )

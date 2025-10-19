@@ -5,7 +5,11 @@ import logging
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Protocol
+import json
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Protocol
+
+if TYPE_CHECKING:  # pragma: no cover - optional dependency for redis integration
+    from redis.asyncio import Redis as AsyncRedis
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +18,15 @@ class MarketDataClient(Protocol):
     """Asynchronous provider for market snapshots consumed by bots."""
 
     async def fetch(self) -> Mapping[str, Any]:
+        ...
+
+    async def fetch_range(
+        self,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        count: Optional[int] = None,
+    ) -> List[Mapping[str, Any
+    ]]:
         ...
 
 
@@ -57,6 +70,14 @@ class NullMarketDataClient:
     async def fetch(self) -> Mapping[str, Any]:
         return {}
 
+    async def fetch_range(
+        self,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        count: Optional[int] = None,
+    ) -> List[Mapping[str, Any]]:
+        return []
+
 
 class StaticMarketDataClient:
     """Always returns the same snapshot."""
@@ -67,6 +88,19 @@ class StaticMarketDataClient:
     async def fetch(self) -> Mapping[str, Any]:
         await asyncio.sleep(0)
         return dict(self._payload)
+
+    async def fetch_range(
+        self,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        count: Optional[int] = None,
+    ) -> List[Mapping[str, Any]]:
+        await asyncio.sleep(0)
+        if not self._payload:
+            return []
+        snapshot = dict(self._payload)
+        snapshot.setdefault("timestamp", datetime.now(timezone.utc))
+        return [snapshot]
 
 
 class StdoutOrderPublisher:
@@ -153,12 +187,216 @@ class QueueMarketDataClient:
 
     def __init__(self) -> None:
         self._queue: asyncio.Queue[Mapping[str, Any]] = asyncio.Queue()
+        self._history: List[Mapping[str, Any]] = []
 
     async def fetch(self) -> Mapping[str, Any]:
-        return await self._queue.get()
+        payload = await self._queue.get()
+        self._history.append(dict(payload))
+        return payload
 
     async def put(self, payload: Mapping[str, Any]) -> None:
         await self._queue.put(payload)
+
+    async def fetch_range(
+        self,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        count: Optional[int] = None,
+    ) -> List[Mapping[str, Any]]:
+        await asyncio.sleep(0)
+        return list(self._history)
+
+
+class RedisTimeSeriesMarketDataClient:
+    """Market data client backed by RedisTimeSeries."""
+
+    def __init__(
+        self,
+        redis_client: Any,
+        series_key: str,
+        *,
+        symbol: str,
+        value_field: str = "price",
+        extra_fields: Optional[Mapping[str, str]] = None,
+    ) -> None:
+        if redis_client is None:
+            raise ValueError("redis_client is required")
+        if not hasattr(redis_client, "execute_command"):
+            raise TypeError("redis_client must expose execute_command coroutine")
+
+        self._redis = redis_client
+        self._series_key = series_key
+        self._symbol = symbol
+        self._value_field = value_field
+        self._extra_fields = dict(extra_fields or {})
+        self._base_snapshot: Dict[str, Any] = {"symbol": symbol}
+
+    async def fetch(self) -> Mapping[str, Any]:
+        raw = await self._redis.execute_command("TS.GET", self._series_key)
+        if not raw:
+            return {}
+        sample = self._format_sample(raw)
+        for field, key in self._extra_fields.items():
+            extra = await self._redis.execute_command("TS.GET", key)
+            if not extra:
+                continue
+            sample[field] = coerce_float(extra[1])
+        return sample
+
+    async def fetch_range(
+        self,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        count: Optional[int] = None,
+    ) -> List[Mapping[str, Any]]:
+        args: List[Any] = [
+            "TS.RANGE",
+            self._series_key,
+            encode_timestamp(start, fallback="-"),
+            encode_timestamp(end, fallback="+"),
+        ]
+        if count:
+            args.extend(["COUNT", count])
+        raw = await self._redis.execute_command(*args)
+        items: List[Mapping[str, Any]] = []
+        for entry in raw or []:
+            items.append(self._format_sample(entry))
+        return items
+
+    def _format_sample(self, payload: Iterable[Any]) -> Dict[str, Any]:
+        entry = list(payload)
+        if len(entry) != 2:
+            raise ValueError(f"unexpected sample shape: {entry!r}")
+        timestamp = coerce_datetime(entry[0])
+        value = coerce_float(entry[1])
+        snapshot = dict(self._base_snapshot)
+        snapshot[self._value_field] = value
+        snapshot["timestamp"] = timestamp
+        return snapshot
+
+
+def encode_timestamp(value: Optional[datetime], fallback: str) -> Any:
+    if value is None:
+        return fallback
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return int(value.timestamp() * 1000)
+
+
+def coerce_datetime(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+    if isinstance(value, (bytes, bytearray)):
+        value = value.decode()
+    if isinstance(value, str):
+        value = int(value)
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(int(value) / 1000.0, tz=timezone.utc)
+    raise TypeError(f"cannot parse timestamp from {value!r}")
+
+
+def coerce_float(value: Any) -> float:
+    if isinstance(value, float):
+        return value
+    if isinstance(value, (bytes, bytearray)):
+        value = value.decode()
+    if isinstance(value, str):
+        return float(value)
+    if isinstance(value, (int, float)):
+        return float(value)
+    raise TypeError(f"cannot parse float from {value!r}")
+
+
+class RedisStreamMarketDataClient:
+    """Market data client backed by Redis Streams."""
+
+    def __init__(
+        self,
+        redis_client: Any,
+        stream_key: str,
+        *,
+        last_id: str = "$",
+        block_ms: int = 5000,
+    ) -> None:
+        if redis_client is None:
+            raise ValueError("redis_client is required")
+        if not hasattr(redis_client, "xread"):
+            raise TypeError("redis_client must expose xread coroutine")
+
+        self._redis = redis_client
+        self._stream_key = stream_key
+        self._last_id = last_id
+        self._block = block_ms
+
+    async def fetch(self) -> Mapping[str, Any]:
+        params = {self._stream_key: self._last_id}
+        result = await self._redis.xread(streams=params, count=1, block=self._block)
+        if not result:
+            return {}
+
+        stream, entries = result[0]
+        entry_id, payload = entries[0]
+        self._last_id = entry_id
+
+        decoded = {k: decode_entry_value(v) for k, v in dict(payload).items()}
+        if "payload" in decoded:
+            try:
+                snapshot = json.loads(decoded["payload"])
+            except json.JSONDecodeError:
+                snapshot = {"payload": decoded["payload"]}
+        else:
+            snapshot = decoded
+
+        if "timestamp" in snapshot:
+            parsed = _coerce_stream_timestamp(snapshot["timestamp"])
+            if parsed:
+                snapshot["timestamp"] = parsed
+
+        snapshot.setdefault("stream_id", entry_id)
+        snapshot.setdefault("stream", stream)
+        return snapshot
+
+    async def fetch_range(
+        self,
+        start: Optional[datetime] = None,
+        end: Optional[datetime] = None,
+        count: Optional[int] = None,
+    ) -> List[Mapping[str, Any]]:
+        # Range queries are not supported by default; bots can use Redis directly.
+        return []
+
+
+def decode_entry_value(value: Any) -> Any:
+    if isinstance(value, (bytes, bytearray)):
+        try:
+            return value.decode()
+        except Exception:  # pragma: no cover - defensive
+            return value
+    return value
+
+
+def _coerce_stream_timestamp(raw: Any) -> Optional[datetime]:
+    if raw is None:
+        return None
+    if isinstance(raw, datetime):
+        return raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
+    if isinstance(raw, (int, float)):
+        return datetime.fromtimestamp(float(raw) / 1000.0, tz=timezone.utc)
+    if isinstance(raw, str):
+        # try milliseconds integer
+        try:
+            numeric = float(raw)
+        except ValueError:
+            try:
+                iso = raw.replace("Z", "+00:00")
+                return datetime.fromisoformat(iso)
+            except ValueError:
+                return None
+        else:
+            return datetime.fromtimestamp(numeric / 1000.0, tz=timezone.utc)
+    return None
 
 
 class HeartbeatBuffer:

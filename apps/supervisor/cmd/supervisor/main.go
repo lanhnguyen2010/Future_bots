@@ -10,6 +10,7 @@ import (
 
 	"github.com/future-bots/platform/config"
 	platformdb "github.com/future-bots/platform/db"
+	platformredis "github.com/future-bots/platform/redis"
 	"github.com/future-bots/platform/server"
 	"github.com/future-bots/supervisor/internal/bots"
 	"github.com/future-bots/supervisor/internal/http"
@@ -29,6 +30,35 @@ func main() {
 	repo := bots.NewMemoryRepository()
 	writer := bots.NewFileManifestWriter(manifestDir)
 	service := bots.NewService(repo, writer, logger)
+
+	if addr := os.Getenv("SUPERVISOR_REDIS_ADDR"); addr != "" {
+		redisCfg := platformredis.Config{
+			Addr:         addr,
+			Username:     os.Getenv("SUPERVISOR_REDIS_USERNAME"),
+			Password:     os.Getenv("SUPERVISOR_REDIS_PASSWORD"),
+			DB:           config.IntFromEnv("SUPERVISOR_REDIS_DB", 0),
+			DialTimeout:  config.DurationFromEnv("SUPERVISOR_REDIS_DIAL_TIMEOUT", 5*time.Second),
+			ReadTimeout:  config.DurationFromEnv("SUPERVISOR_REDIS_READ_TIMEOUT", 3*time.Second),
+			WriteTimeout: config.DurationFromEnv("SUPERVISOR_REDIS_WRITE_TIMEOUT", 3*time.Second),
+		}
+		redisClient := platformredis.NewClient(redisCfg)
+
+		pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		if err := redisClient.Ping(pingCtx).Err(); err != nil {
+			logger.Error("failed to connect to redis", "addr", redisCfg.Addr, "error", err)
+			redisClient.Close()
+		} else {
+			retention := config.DurationFromEnv("SUPERVISOR_REDIS_METRIC_RETENTION", 30*24*time.Hour)
+			service = service.WithTelemetry(bots.NewTimeSeriesTelemetry(platformredis.NewTimeSeries(redisClient), retention))
+			logger.Info("redis telemetry enabled", "addr", redisCfg.Addr, "retention", retention)
+			defer func() {
+				if err := redisClient.Close(); err != nil {
+					logger.Warn("failed to close redis client", "error", err)
+				}
+			}()
+		}
+		cancel()
+	}
 
 	handler := http.NewRouter(logger, service)
 

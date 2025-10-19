@@ -40,6 +40,9 @@ Run `make help` to see available commands. Key targets include:
 - `make seed` – apply core schemas to the Timescale database.
 - `make api` – run the Supervisor/Executor Go services locally.
 - `make bot` – execute a Python bot using the SDK runner.
+- `make marketdata-seed` – inject sample `RedisTimeSeries` ticks for quick local testing.
+- `make producer` – parse SSI sample data and publish `SsiPsSnapshot` records to Kafka.
+- `make consumer` – subscribe to `ssi_ps` Kafka topic and persist snapshots to RedisTimeSeries.
 - `make down` – stop all local dependencies and clean volumes.
 
 ## Protobuf Schemas
@@ -61,6 +64,60 @@ Makefile target above or run `docker compose up -d` manually to bring the stack
 online. Default credentials match the documentation: `qubit`/`qubit` for the
 database and plaintext listeners on `localhost:9092` and `localhost:9094` for
 Kafka.
+
+Redis is provided via the `redis/redis-stack` image so the `RedisTimeSeries`
+module is available out of the box; the compose health check now verifies the
+module is loaded before other services attempt to connect.
+
+### RedisTimeSeries Market Data
+
+Sample ticker data can be seeded with `make marketdata-seed`, which executes
+`apps/reports/cmd/seed-marketdata` against the local Redis instance. The command
+creates price and volume time series under `markets:<ticker>:price|volume` (by
+default `VN30F1M`). Adjust the target using environment variables, for example:
+
+```bash
+MARKETDATA_TICKER=VN30F2M MARKETDATA_REDIS_ADDR=localhost:6379 make marketdata-seed
+```
+
+Bots can consume the data using the new
+`RedisTimeSeriesMarketDataClient` available from the Python SDK
+(`bots/python/sdk/connectors.py`), which exposes `fetch` and `fetch_range`
+helpers for retrieving the latest point or a bounded time window.
+
+### Kafka Topics
+
+The stack autocrates Kafka topics, but you can explicitly create the Hose
+PowerScreen channel used by the stock parser via:
+
+```bash
+kafka-topics --bootstrap-server localhost:9092 --create --topic ssi_ps --partitions 6 --replication-factor 1
+```
+
+Messages published to `ssi_ps` must conform to
+`proto/markets/v1/ssi_ps.proto` (`markets.v1.SsiPsSnapshot`). The producer CLI
+reads line-delimited payloads from `apps/producer/internal/data` (override with
+`PRODUCER_DATA_FILE`), parses them via the Hose stock parser, and writes
+protobuf-encoded snapshots. Key environment variables:
+
+- `PRODUCER_KAFKA_BROKERS` – comma separated broker list (default `localhost:9092`).
+- `PRODUCER_TOPIC` – Kafka topic name (default `ssi_ps`).
+- `PRODUCER_TOPIC_PARTITIONS` / `PRODUCER_TOPIC_REPLICATION` – optional topic sizing.
+- `PRODUCER_DATA_FILE` – alternate input file path.
+
+`make consumer` consumes the same topic, decodes the protobuf payload, and
+stores each full snapshot as JSON inside a Redis sorted set keyed by
+`ssi_ps:<code>`, while also publishing to a Redis Stream
+(`ssi_ps_stream:<code>`) for live subscribers. Query a time window via
+`ZRANGEBYSCORE ssi_ps:<code> <start_ms> <end_ms>` and load the JSON rows into a
+dataframe. Configure with:
+
+- `CONSUMER_KAFKA_BROKERS` – broker list.
+- `CONSUMER_KAFKA_TOPIC` / `CONSUMER_KAFKA_GROUP` – topic & consumer group.
+- `CONSUMER_REDIS_ADDR` – Redis endpoint.
+- `CONSUMER_REDIS_KEY_FMT` – optional `fmt.Sprintf` pattern for the sorted-set key.
+- `CONSUMER_REDIS_STREAM_FMT` – optional `fmt.Sprintf` pattern for stream keys.
+- `CONSUMER_METRIC_PREFIX` – optional namespace applied when no custom format is supplied.
 
 ### Minikube Deployment
 

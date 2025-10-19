@@ -11,6 +11,7 @@ that connect trading bots with the control plane, executor, and risk services.
 | `orders.event.account.<account_id>.<bot_id>` | [`orders/v1/orders.proto`](orders/v1/orders.proto) (`OrderEvent`) | Execution acknowledgements, fills, rejections, and cancels emitted by the executor. |
 | `risk.alerts.account.<account_id>` | [`risk/v1/alerts.proto`](risk/v1/alerts.proto) (`RiskAlert`) | Broadcast risk policy alerts for supervisory dashboards and bots. |
 | `bot.commands.<bot_id>` | [`bot/v1/commands.proto`](bot/v1/commands.proto) (`BotCommandEnvelope`) | Supervisor-issued runtime commands (start, stop, rollout). |
+| `ssi_ps` | [`markets/v1/ssi_ps.proto`](markets/v1/ssi_ps.proto) (`SsiPsSnapshot`) | Hose PowerScreen market depth snapshots parsed from SSI feed. |
 
 ## Generating code
 
