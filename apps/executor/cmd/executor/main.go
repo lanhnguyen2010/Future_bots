@@ -10,6 +10,8 @@ import (
 
 	"github.com/future-bots/executor/internal/http"
 	"github.com/future-bots/executor/internal/migrations"
+	"github.com/future-bots/executor/internal/repository"
+	"github.com/future-bots/executor/internal/service"
 	"github.com/future-bots/platform/config"
 	platformdb "github.com/future-bots/platform/db"
 	"github.com/future-bots/platform/server"
@@ -23,7 +25,9 @@ func main() {
 	addr := config.EnvOrDefault("EXECUTOR_ADDR", ":8081")
 	shutdownTimeout := config.DurationFromEnv("EXECUTOR_SHUTDOWN_TIMEOUT", 10*time.Second)
 
-	handler := http.NewRouter(logger)
+	repo := repository.NewMemory()
+	svc := service.New(repo, nil)
+	handler := http.NewRouter(logger, svc)
 
 	if dsn := os.Getenv("EXECUTOR_DATABASE_URL"); dsn != "" {
 		driverName := config.EnvOrDefault("EXECUTOR_DATABASE_DRIVER", "pgx")

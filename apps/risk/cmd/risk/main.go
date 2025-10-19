@@ -13,6 +13,8 @@ import (
 	"github.com/future-bots/platform/server"
 	"github.com/future-bots/risk/internal/http"
 	"github.com/future-bots/risk/internal/migrations"
+	"github.com/future-bots/risk/internal/repository"
+	"github.com/future-bots/risk/internal/service"
 )
 
 func main() {
@@ -23,7 +25,9 @@ func main() {
 	addr := config.EnvOrDefault("RISK_ADDR", ":8082")
 	shutdownTimeout := config.DurationFromEnv("RISK_SHUTDOWN_TIMEOUT", 10*time.Second)
 
-	handler := http.NewRouter(logger)
+	repo := repository.NewMemory(10)
+	svc := service.New(repo, nil)
+	handler := http.NewRouter(logger, svc)
 
 	if dsn := os.Getenv("RISK_DATABASE_URL"); dsn != "" {
 		driverName := config.EnvOrDefault("RISK_DATABASE_DRIVER", "pgx")

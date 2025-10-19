@@ -1,4 +1,4 @@
-package db
+package db_test
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"testing"
 	"testing/fstest"
 	"time"
+
+	platformdb "github.com/future-bots/platform/db"
 )
 
 func TestRunAppliesMigrationsFromFilesystem(t *testing.T) {
@@ -29,7 +31,7 @@ func TestRunAppliesMigrationsFromFilesystem(t *testing.T) {
 		"migrations/0002_add_name.up.sql": {Data: []byte("ALTER TABLE bots ADD COLUMN name TEXT;")},
 	}
 
-	if err := Run(context.Background(), database, fs, "migrations"); err != nil {
+	if err := platformdb.Run(context.Background(), database, fs, "migrations"); err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
 
@@ -60,7 +62,7 @@ func TestRunSkipsAppliedMigrations(t *testing.T) {
 		"migrations/0001_init.up.sql": {Data: []byte("CREATE TABLE bots(id TEXT PRIMARY KEY);")},
 	}
 
-	if err := Run(context.Background(), database, fs, "migrations"); err != nil {
+	if err := platformdb.Run(context.Background(), database, fs, "migrations"); err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
 
@@ -71,10 +73,10 @@ func TestRunSkipsAppliedMigrations(t *testing.T) {
 
 func TestRunFromDSNRejectsEmptyInputs(t *testing.T) {
 	ctx := context.Background()
-	if err := RunFromDSN(ctx, "", "dsn", fstest.MapFS{}, "."); err == nil {
+	if err := platformdb.RunFromDSN(ctx, "", "dsn", fstest.MapFS{}, "."); err == nil {
 		t.Fatal("expected error for empty driver")
 	}
-	if err := RunFromDSN(ctx, "pgx", "", fstest.MapFS{}, "."); err == nil {
+	if err := platformdb.RunFromDSN(ctx, "pgx", "", fstest.MapFS{}, "."); err == nil {
 		t.Fatal("expected error for empty dsn")
 	}
 }
@@ -89,7 +91,7 @@ func TestRunRequiresFilesystem(t *testing.T) {
 	}
 	defer database.Close()
 
-	if err := Run(context.Background(), database, nil, "migrations"); !errors.Is(err, ErrNilFS) {
+	if err := platformdb.Run(context.Background(), database, nil, "migrations"); !errors.Is(err, platformdb.ErrNilFS) {
 		t.Fatalf("expected ErrNilFS, got %v", err)
 	}
 }
@@ -108,13 +110,13 @@ func TestRunRequiresNumericPrefix(t *testing.T) {
 		"migrations/init.up.sql": {Data: []byte("SELECT 1;")},
 	}
 
-	if err := Run(context.Background(), database, fs, "migrations"); err == nil {
+	if err := platformdb.Run(context.Background(), database, fs, "migrations"); err == nil {
 		t.Fatal("expected error for missing numeric prefix")
 	}
 }
 
 func TestRunRejectsNilDB(t *testing.T) {
-	if err := Run(context.Background(), nil, fstest.MapFS{}, "migrations"); !errors.Is(err, ErrNilDB) {
+	if err := platformdb.Run(context.Background(), nil, fstest.MapFS{}, "migrations"); !errors.Is(err, platformdb.ErrNilDB) {
 		t.Fatalf("expected ErrNilDB, got %v", err)
 	}
 }

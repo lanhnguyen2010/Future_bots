@@ -3,23 +3,13 @@ package http
 import (
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/future-bots/platform/httpx"
+	"github.com/future-bots/reports/internal/service"
 )
 
-// PnLReport represents a simplified profit and loss report response.
-type PnLReport struct {
-	AccountID  string    `json:"account_id"`
-	BotID      string    `json:"bot_id"`
-	Realized   float64   `json:"realized"`
-	Unrealized float64   `json:"unrealized"`
-	Window     string    `json:"window"`
-	Generated  time.Time `json:"generated_at"`
-}
-
 // NewRouter assembles the reports service HTTP routes.
-func NewRouter(logger *slog.Logger) http.Handler {
+func NewRouter(logger *slog.Logger, svc service.Service) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /openapi.json", serveOpenAPI)
@@ -34,17 +24,16 @@ func NewRouter(logger *slog.Logger) http.Handler {
 	})
 
 	mux.HandleFunc("GET /api/v1/reports/pnl", func(w http.ResponseWriter, r *http.Request) {
-		accountID := r.URL.Query().Get("account_id")
-		if accountID == "" {
-			accountID = "acct-123"
+		query := service.PnLQuery{
+			AccountID: r.URL.Query().Get("account_id"),
+			BotID:     r.URL.Query().Get("bot_id"),
+			Window:    r.URL.Query().Get("window"),
 		}
-		report := PnLReport{
-			AccountID:  accountID,
-			BotID:      r.URL.Query().Get("bot_id"),
-			Realized:   1525.23,
-			Unrealized: 210.42,
-			Window:     "1d",
-			Generated:  time.Now().UTC(),
+		report, err := svc.GeneratePnLReport(r.Context(), query)
+		if err != nil {
+			logger.Error("failed to generate pnl report", "error", err)
+			httpx.Error(w, http.StatusInternalServerError, "failed to generate report")
+			return
 		}
 		logger.Info("generated pnl report", "account_id", report.AccountID, "bot_id", report.BotID)
 		httpx.JSON(w, http.StatusOK, report)

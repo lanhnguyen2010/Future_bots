@@ -13,6 +13,8 @@ import (
 	"github.com/future-bots/platform/server"
 	"github.com/future-bots/reports/internal/http"
 	"github.com/future-bots/reports/internal/migrations"
+	"github.com/future-bots/reports/internal/repository"
+	"github.com/future-bots/reports/internal/service"
 )
 
 func main() {
@@ -23,7 +25,9 @@ func main() {
 	addr := config.EnvOrDefault("REPORTS_ADDR", ":8083")
 	shutdownTimeout := config.DurationFromEnv("REPORTS_SHUTDOWN_TIMEOUT", 10*time.Second)
 
-	handler := http.NewRouter(logger)
+	repo := repository.NewMemory(0, 0)
+	svc := service.New(repo, "", nil)
+	handler := http.NewRouter(logger, svc)
 
 	if dsn := os.Getenv("REPORTS_DATABASE_URL"); dsn != "" {
 		driverName := config.EnvOrDefault("REPORTS_DATABASE_DRIVER", "pgx")
